@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}</style>
+<title>Paint the Room ICP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@500;700&family=Roboto+Condensed:ital,wght@0,400;0,700;1,400&family=Noto+Serif:wght@700&display=swap">
+<style>
+/* Layout: projector console. Step rail on the left, one big step card + timer on the right, proportional timeline along the bottom. */
+:root{
+  --bg:#f3f5f7;
+  --surface:#ffffff;
+  --ink:#16202b;
+  --muted:#5a6878;
+  --line:#d5dde5;
+  --tape:#1f6fd1;          /* painter's tape blue: accent */
+  --tape-soft:#e3eefb;
+  --walk:#0f8a5f;          /* place: around the room */
+  --walk-soft:#e0f3ec;
+  --desk:#6b5bd2;          /* place: at desks */
+  --desk-soft:#ecebfb;
+  --pc:#c25a12;            /* place: at PCs */
+  --pc-soft:#fbeadd;
+  --warn:#c98a00;
+  --stop:#c62f2f;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Atkinson Hyperlegible",Verdana,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151c;--surface:#17202a;--ink:#e8eef5;--muted:#9aa9b9;--line:#2a3643;
+  --tape:#5aa2ff;--tape-soft:#16314f;--walk:#3cc995;--walk-soft:#123829;--desk:#a297ff;--desk-soft:#262249;
+  --pc:#ff9a4d;--pc-soft:#3d2614;--warn:#f0b429;--stop:#ff6b6b;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f151c;--surface:#17202a;--ink:#e8eef5;--muted:#9aa9b9;--line:#2a3643;
+  --tape:#5aa2ff;--tape-soft:#16314f;--walk:#3cc995;--walk-soft:#123829;--desk:#a297ff;--desk-soft:#262249;
+  --pc:#ff9a4d;--pc-soft:#3d2614;--warn:#f0b429;--stop:#ff6b6b;color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;box-sizing:border-box}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
+
+.app{max-width:1400px;margin:0 auto;display:grid;gap:16px;grid-template-rows:auto 1fr auto;min-height:calc(100% - 0px)}
+
+/* top bar */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;
+  border-bottom:4px solid var(--tape);padding-bottom:12px}
+.brand h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,4vw,46px);line-height:1;margin:0;letter-spacing:.01em;text-wrap:balance}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:15px}
+.brand p b{color:var(--ink)}
+.overall{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.clockbox{text-align:right}
+.clockbox .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.clockbox .val{font-family:var(--mono);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
+.tool{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-size:14px}
+.tool[aria-pressed="true"]{background:var(--tape-soft);border-color:var(--tape)}
+
+/* main */
+.stage{display:grid;grid-template-columns:minmax(240px,300px) 1fr;gap:16px;min-height:0}
+.rail{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.rail button{width:100%;display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:10px;text-align:left;
+  background:transparent;border:1px solid transparent;border-radius:10px;padding:10px 10px}
+.rail button:hover{background:var(--surface);border-color:var(--line)}
+.rail .num{font-family:var(--display);font-weight:700;font-size:24px;color:var(--muted);text-align:center}
+.rail .nm{font-weight:700;font-size:16px;line-height:1.2;min-width:0}
+.rail .nm small{display:block;font-weight:400;font-size:13px;color:var(--muted)}
+.rail .dur{font-family:var(--mono);font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rail li.done .num{color:var(--walk)}
+.rail li.done .nm{color:var(--muted)}
+.rail li.current button{background:var(--surface);border-color:var(--tape);box-shadow:inset 4px 0 0 var(--tape)}
+.rail li.current .num{color:var(--tape)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:clamp(18px,2.5vw,32px);
+  display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.9fr);gap:28px;min-width:0}
+.content{min-width:0;display:flex;flex-direction:column;gap:14px}
+.place{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px;
+  text-transform:uppercase;letter-spacing:.1em;padding:6px 12px;border-radius:999px}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.who{display:inline-flex;align-items:center;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:.1em;padding:5px 12px;border-radius:999px;border:2px solid var(--line);color:var(--ink)}
+.who.runners{border-color:var(--walk);color:var(--walk)}
+.who.solo{border-color:var(--tape);color:var(--tape)}
+.place .dot{width:10px;height:10px;border-radius:50%;background:currentColor}
+.place.desk{background:var(--desk-soft);color:var(--desk)}
+.place.walk{background:var(--walk-soft);color:var(--walk)}
+.place.pc{background:var(--pc-soft);color:var(--pc)}
+.stepno{font-family:var(--display);font-weight:600;font-size:18px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin:0}
+.content h2{font-family:var(--display);font-weight:700;font-size:clamp(30px,3.6vw,50px);line-height:.98;margin:0;text-wrap:balance}
+.goal{font-size:clamp(18px,1.6vw,22px);margin:0;max-width:60ch}
+.todo{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:8px;font-size:clamp(17px,1.45vw,20px);max-width:62ch}
+.todo li::marker{color:var(--tape);font-weight:700}
+.record{border:2px dashed var(--line);border-radius:10px;padding:12px 14px;font-size:16px;max-width:62ch}
+.record b{font-family:var(--display);font-size:17px;letter-spacing:.08em;text-transform:uppercase;color:var(--tape);margin-right:6px}
+.formula{font-family:var(--mono);font-size:15px;background:var(--tape-soft);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;max-width:100%}
+
+
+/* Excel template mirror: always light, like the real workbook */
+:root{--xl-green:#154734;--xl-orange:#AE5700;--xl-sec:#D0D0D0;--xl-grid:#E1E1E1;--xl-head:#F3F3F3;--xl-headtx:#555;--xl-ink:#000;--xl-ghost:#8a8a8a;--xl-hi:#FFF2B3;--xl-hiline:#E0B400;--xl-paper:#fff}
+.sheetwrap{max-width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--xl-paper)}
+.sheetcap{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin-bottom:-6px}
+.sheetcap .xl{font-weight:700;color:#fff;background:var(--xl-green);border-radius:4px;padding:1px 7px;font-size:12px;letter-spacing:.06em}
+table.xlsheet{border-collapse:collapse;table-layout:fixed;width:100%;min-width:540px;font-family:"Aptos Narrow","Arial Narrow","Roboto Condensed",Arial,sans-serif;font-size:15px;color:var(--xl-ink);background:var(--xl-paper)}
+.xlsheet th,.xlsheet td{border:1px solid var(--xl-grid);height:26px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xlsheet thead th{background:var(--xl-head);color:var(--xl-headtx);font-weight:400;font-size:12px;text-align:center;height:20px}
+.xlsheet td.rn{background:var(--xl-head);color:var(--xl-headtx);font-size:12px;text-align:center;padding:0}
+.xlsheet tr.title td:not(.rn){background:var(--xl-green);color:#fff;font-family:Cambria,"Noto Serif",Georgia,serif;font-weight:700;font-size:16px}
+.xlsheet tr.sec td:not(.rn){background:var(--xl-sec);color:var(--xl-green);font-family:Cambria,"Noto Serif",Georgia,serif;font-weight:700;font-size:16px;border-top:1px solid #000}
+.xlsheet tr.band td:not(.rn){background:var(--xl-orange)}
+.xlsheet tr.hdr td:not(.rn){background:var(--xl-green);color:#fff;font-weight:700;text-align:center;border-color:#000}
+.xlsheet td.c{text-align:center}
+.xlsheet td.b{font-weight:700}
+.xlsheet td.ghost{color:var(--xl-ghost);font-style:italic}
+.xlsheet tr.hi td:not(.rn){background:var(--xl-hi)}
+.xlsheet tr.hi td.rn{background:var(--xl-hiline);color:#000;font-weight:700}
+.legend{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:14px;height:14px;background:var(--xl-hi);border:1px solid var(--xl-hiline);border-radius:3px}
+
+/* timer */
+.timer{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-width:0;
+  border-left:1px solid var(--line);padding-left:28px}
+.ringwrap{position:relative;width:min(100%,340px);aspect-ratio:1;max-width:100%}
+.ringwrap svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ringwrap circle{fill:none;stroke-width:14}
+.ring-bg{stroke:var(--line)}
+.ring-fg{stroke:var(--tape);stroke-linecap:round;transition:stroke .3s}
+.timer.warn .ring-fg{stroke:var(--warn)}
+.timer.over .ring-fg{stroke:var(--stop)}
+.readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.digits{font-family:var(--mono);font-weight:700;font-size:clamp(54px,6.4vw,92px);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.timer.warn .digits{color:var(--warn)}
+.timer.over .digits{color:var(--stop)}
+.substate{margin-top:6px;font-size:14px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 14px;font-weight:700;font-size:16px}
+.btn:hover{border-color:var(--tape)}
+.btn.primary{background:var(--tape);border-color:var(--tape);color:var(--surface);min-width:130px;font-size:18px}
+.adjust{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:14px}
+.adjust .btn{font-size:14px;padding:6px 10px}
+.keys{font-size:12px;color:var(--muted);text-align:center}
+kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 5px}
+
+/* timeline */
+.timeline{display:flex;gap:4px;height:34px}
+.seg{position:relative;border-radius:6px;background:var(--line);overflow:hidden;min-width:28px;border:0;padding:0}
+.seg .fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--tape);opacity:.9}
+.seg.done .fill{width:100%;background:var(--walk)}
+.seg span{position:relative;font-family:var(--display);font-weight:700;font-size:15px;line-height:34px;padding:0 8px;white-space:nowrap;color:var(--ink)}
+.seg.done span{color:var(--surface)}
+.seg.current{box-shadow:inset 0 0 0 2px var(--tape)}
+.seg.current .fill{background:var(--tape)}
+
+/* full-screen time-up alert */
+.alert{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+  padding:calc(24px + env(safe-area-inset-top,0px)) max(24px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));
+  background:var(--tape);color:#fff;text-align:center}
+.alert.pc{background:var(--pc)}
+.alert .inner{max-width:1000px;display:flex;flex-direction:column;align-items:center;gap:18px}
+.alert .kicker{font-family:var(--display);font-weight:600;font-size:clamp(20px,2.4vw,30px);letter-spacing:.14em;text-transform:uppercase;opacity:.9}
+.alert h3{font-family:var(--display);font-weight:700;font-size:clamp(56px,10vw,150px);line-height:.92;margin:0;text-wrap:balance}
+.alert p{font-size:clamp(18px,2vw,26px);margin:0;max-width:40ch}
+.alert .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.alert button{border:2px solid #fff;background:transparent;color:#fff;border-radius:12px;padding:12px 20px;font-weight:700;font-size:18px}
+.alert button.solid{background:#fff;color:var(--ink)}
+.alert.flash{animation:flash 1s steps(2) 3}
+@keyframes flash{50%{filter:brightness(1.25)}}
+@media (prefers-reduced-motion: reduce){.alert.flash{animation:none}.ring-fg{transition:none}}
+
+@media (max-width:1100px){
+  .card{grid-template-columns:1fr}
+  .timer{border-left:0;border-top:1px solid var(--line);padding-left:0;padding-top:24px}
+  .ringwrap{width:min(100%,280px)}
+}
+@media (max-width:820px){
+  .stage{grid-template-columns:1fr}
+  .rail{flex-direction:row;overflow-x:auto;padding-bottom:4px}
+  .rail li{flex:0 0 auto}
+  .rail button{grid-template-columns:auto auto;gap:6px}
+  .rail .nm small,.rail .dur{display:none}
+  .seg span{display:none}
+  .clockbox{text-align:left}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Paint the Room</h1>
+      <p>ECS 1100 · Estimation ICP · <b>groups of 3–4, two runners, two methods</b> · How many gallons to paint the walls of this classroom?</p>
+    </div>
+    <div class="overall">
+      <div class="clockbox"><div class="lbl">Activity time left</div><div class="val" id="totalLeft">0:00</div></div>
+      <button class="tool" id="soundBtn" aria-pressed="true" type="button">Sound on</button>
+      <button class="tool" id="fsBtn" type="button">Full screen</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <ol class="rail" id="rail"></ol>
+    <section class="card" aria-live="polite">
+      <div class="content">
+        <div class="pills"><span class="place" id="place"><span class="dot"></span><span id="placeTxt"></span></span><span class="who" id="who"></span></div>
+        <p class="stepno" id="stepno"></p>
+        <h2 id="title"></h2>
+        <p class="goal" id="goal"></p>
+        <ol class="todo" id="todo"></ol>
+        <div class="formula" id="formula" hidden></div>
+        <div id="sheet" hidden></div>
+        <div class="record" id="record"></div>
+      </div>
+      <div class="timer" id="timer">
+        <div class="ringwrap">
+          <svg viewBox="0 0 200 200" aria-hidden="true">
+            <circle class="ring-bg" cx="100" cy="100" r="88"></circle>
+            <circle class="ring-fg" id="ring" cx="100" cy="100" r="88"></circle>
+          </svg>
+          <div class="readout"><div class="digits" id="digits">0:00</div><div class="substate" id="substate">Ready</div></div>
+        </div>
+        <div class="controls">
+          <button class="btn" id="prevBtn" type="button">← Back</button>
+          <button class="btn primary" id="startBtn" type="button">Start</button>
+          <button class="btn" id="nextBtn" type="button">Next →</button>
+        </div>
+        <div class="adjust">
+          <button class="btn" id="minusBtn" type="button">−1 min</button>
+          <button class="btn" id="resetBtn" type="button">Reset</button>
+          <button class="btn" id="plusBtn" type="button">+1 min</button>
+        </div>
+        <div class="keys"><kbd>Space</kbd> start/pause · <kbd>←</kbd><kbd>→</kbd> step · <kbd>R</kbd> reset · <kbd>+</kbd><kbd>−</kbd> minute</div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="timeline" id="timeline" aria-label="Activity timeline"></nav>
+</div>
+
+<div class="alert" id="alert" hidden role="alertdialog" aria-labelledby="alertTitle">
+  <div class="inner">
+    <div class="kicker" id="alertKicker">Time</div>
+    <h3 id="alertTitle">Next step</h3>
+    <p id="alertText"></p>
+    <div class="row">
+      <button class="solid" id="alertGo" type="button">Start next step</button>
+      <button id="alertStay" type="button">Stay on this step</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STEPS=[
+ {short:"Split into teams",min:3,place:"desk",placeTxt:"At your desks",who:"group",whoTxt:"Whole group",
+  title:"Split into two teams",
+  goal:"Each group of 3–4 splits into two teams. Each team will estimate the room its own way.",
+  todo:["Group of 4: two teams of 2. Group of 3: a team of 2 and a team of 1.",
+        "Each team sends <b>one runner</b> out to collect data. Two runners, two different methods.",
+        "Each runner picks a reference they trust: their own height, arm span, a TV, a door, a ceiling tile.",
+        "Name the reference by its owner, for example <b>James's height</b>."],
+  record:"The two runners' names and the reference each one will use."},
+ {short:"Collect data",min:7,place:"walk",placeTxt:"Around the room",who:"runners",whoTxt:"Runners only",
+  title:"Runners: collect the data",
+  goal:"Each runner sizes up the room with their own reference. Do not copy the other runner.",
+  todo:["Compare the long wall, short wall and wall height to your reference: <i>“the wall is about 2.5 times my height.”</i>",
+        "If your reference needs a size, measure it with your body: <i>“the TV is about my shoulder-to-waist distance.”</i>",
+        "Note every door, window, whiteboard and screen, with a rough size.",
+        "<b>Teammates at the PC:</b> open the Estimation Template and fill in names, section and date."],
+  sheet:{cap:"Teammates at the PC: top of the template, rows 1–5",rows:[
+   {n:1,k:"title",t:"ECS 1100 HW 9: Estimation"},
+   {n:2,hi:1,c:[["Name:",1,"b"],["",1],["Your own name",4,"ghost"]]},
+   {n:3,hi:1,c:[["Partners:",1,"b"],["",1],["Everyone else in your group",4,"ghost"]]},
+   {n:4,hi:1,c:[["Section:",1,"b"],["",1],["Your section",4,"ghost"]]},
+   {n:5,hi:1,c:[["Date:",1,"b"],["",1],["Today's date",4,"ghost"]]},
+   {n:6,k:"band",t:""}]},
+  record:"Every multiple (room height = 2.5 × James's height) and every opening.",
+  endAlert:{pc:true,kicker:"Data collection is over",title:"Runners, come back",text:"Bring your numbers back to your group's PCs. Assumptions come next."}},
+ {short:"Assumptions",min:4,place:"pc",placeTxt:"At your PCs",who:"group",whoTxt:"Whole group, together",
+  title:"Agree on your assumptions",
+  goal:"Put every assumption on the table. Anyone in the group can add one.",
+  todo:["Reference sizes are assumptions: <i>“James is 5′9″ (5.75 ft), the last time he checked.”</i> From here on, that is your reality.",
+        "Limits are assumptions too: <i>“This room is not more than 50 ft high.”</i> If an estimate breaks a limit, argue it out and recheck.",
+        "Paint facts: walls only, 2 coats, 350 sq ft per gallon, 10% extra for waste.",
+        "Everyone writes the same assumptions in <b>their own</b> workbook."],
+  sheet:{cap:"1. Assumptions/Estimates, rows 10–13",rows:[
+   {n:8,k:"sec",t:"1. Assumptions/Estimates"},
+   {n:10,k:"hdr",t:"Assumptions"},
+   {n:11,hi:1,t:"1. James is 5′9″ (5.75 ft), the last time he checked."},
+   {n:12,hi:1,t:"2. This room is not more than 50 ft high."},
+   {n:13,hi:1,t:"3. Walls only, 2 coats, 350 sq ft per gallon, 10% extra for waste."}]},
+  record:"Section 1, Assumptions: every assumption, one per line."},
+ {short:"Estimated parameters",min:6,place:"pc",placeTxt:"At your PCs",who:"solo",whoTxt:"Everyone, on your own",
+  title:"Enter the estimated parameters",
+  goal:"Each person fills in their own workbook with both runners' data.",
+  todo:["One row for each reference, with value and units: <b>James's height · 5.75 · ft</b>.",
+        "The row under it is the multiple: <b>Room height ÷ James's height · 2.5 · times</b>.",
+        "Same for the other runner: <b>TV height · 2 · ft</b>, then <b>Room height ÷ TV height · 5 · times</b>.",
+        "Add rows for both wall lengths and each opening. Use Notes to say who measured it and how."],
+  sheet:{cap:"1. Assumptions/Estimates, rows 14–22",rows:[
+   {n:14,k:"hdr",c:[["Estimated Parameter",2],["Value",1],["Units",1],["Notes",2]]},
+   {n:15,hi:1,c:[["James's height",2],["5.75",1,"c"],["ft",1,"c"],["Runner 1, last checked",2]]},
+   {n:16,hi:1,c:[["Room height ÷ James's height",2],["2.5",1,"c"],["times",1,"c"],["Runner 1, by eye",2]]},
+   {n:17,hi:1,c:[["TV height (shoulder-to-waist)",2],["2.0",1,"c"],["ft",1,"c"],["Runner 2, own body",2]]},
+   {n:18,hi:1,c:[["Room height ÷ TV height",2],["5",1,"c"],["times",1,"c"],["Runner 2, by eye",2]]},
+   {n:19,c:[["Long wall ÷ James's height",2,"ghost"],["…",1,"c ghost"],["times",1,"c ghost"],["add wall lengths",2,"ghost"]]},
+   {n:20,c:[["Short wall ÷ TV height",2,"ghost"],["…",1,"c ghost"],["times",1,"c ghost"],["",2]]},
+   {n:21,c:[["Door width, door height …",2,"ghost"],["…",1,"c ghost"],["ft",1,"c ghost"],["add each opening",2,"ghost"]]},
+   {n:22,c:[["(insert more rows as needed)",2,"ghost"],["",1],["",1],["",2]]}]},
+  record:"A value and a unit on every row."},
+ {short:"Calculations",min:8,place:"pc",placeTxt:"At your PCs",who:"solo",whoTxt:"Everyone, on your own",
+  title:"Calculate the paint",
+  goal:"Turn the multiples into lengths, then into wall area and paint. Do it once for each runner.",
+  todo:["<b>Lengths:</b> reference × multiple. 5.75 ft × 2.5 = 14.4 ft high.",
+        "<b>Each wall:</b> length × height. Add all four walls for the total.",
+        "<b>Subtract</b> doors, windows, whiteboards and screens.",
+        "<b>Paint</b> in gallons, and every result in SI too (1 ft = 0.3048 m, 1 gal = 3.785 L).",
+        "Compare the two runners. Which answer looks closer to reality, and why?"],
+  sheet:{cap:"2. Calculations, rows 25–30",rows:[
+   {n:23,k:"sec",t:"2. Calculations"},
+   {n:25,k:"hdr",c:[["Calculation",2],["Result",1],["Units",1],["Converted Result",1],["Converted Units",1]]},
+   {n:26,hi:1,c:[["Room height, James = 5.75 × 2.5",2],["14.38",1,"c"],["ft",1,"c"],["4.38",1,"c"],["m",1,"c"]]},
+   {n:27,hi:1,c:[["Room height, TV = 2.0 × 5",2],["10.00",1,"c"],["ft",1,"c"],["3.05",1,"c"],["m",1,"c"]]},
+   {n:28,c:[["Each wall area = L × H",2,"ghost"],["…",1,"c ghost"],["sq ft",1,"c ghost"],["…",1,"c ghost"],["sq m",1,"c ghost"]]},
+   {n:29,c:[["Net area = 4 walls − openings",2,"ghost"],["…",1,"c ghost"],["sq ft",1,"c ghost"],["…",1,"c ghost"],["sq m",1,"c ghost"]]},
+   {n:30,c:[["Paint = A × 2 ÷ 350 × 1.10",2,"ghost"],["…",1,"c ghost"],["gal",1,"c ghost"],["…",1,"c ghost"],["L",1,"c ghost"]]}]},
+  record:"Section 2: each wall's area, net area and gallons, for both runners."},
+ {short:"Sensitivity & submit",min:5,place:"pc",placeTxt:"At your PCs",who:"solo",whoTxt:"Everyone, on your own",
+  title:"Sensitivity, then submit",
+  goal:"Pick one estimated parameter and see how much the paint changes.",
+  todo:["Choose one: James's height, or the TV height, for example.",
+        "Fill in −20%, −10%, the value, +10% and +20%, and recompute the paint for each.",
+        "Write 1–2 sentences: did the paint change a lot or a little, and why?",
+        "Save and submit <b>your own</b> workbook."],
+  sheet:{cap:"3. Sensitivity Analysis, rows 33–40",rows:[
+   {n:31,k:"sec",t:"3. Sensitivity Analysis"},
+   {n:33,k:"hdr",c:[["James's height (ft)",2],["Value",1],["Result",1],["",2]]},
+   {n:34,hi:1,c:[["Value -20%",2],["4.60",1,"c"],["gal",1,"c ghost"],["",2]]},
+   {n:35,hi:1,c:[["Value -10%",2],["5.18",1,"c"],["gal",1,"c ghost"],["",2]]},
+   {n:36,hi:1,c:[["Parameter value",2],["5.75",1,"c"],["gal",1,"c ghost"],["",2]]},
+   {n:37,hi:1,c:[["Value +10%",2],["6.33",1,"c"],["gal",1,"c ghost"],["",2]]},
+   {n:38,hi:1,c:[["Value +20%",2],["6.90",1,"c"],["gal",1,"c ghost"],["",2]]},
+   {n:39,k:"hdr",t:"Summary"},
+   {n:40,c:[["1–2 sentences: did the paint change a lot or a little, and why?",6,"ghost"]]}]},
+  record:"Section 3: the five-row table and your summary sentences.",
+  endAlert:{pc:false,kicker:"Time is up",title:"Submit your workbook",text:"Everyone submits their own Excel file."}}
+];
+
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+             set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const saved=store.get("ptr-durations",null);
+if(Array.isArray(saved)&&saved.length===STEPS.length) saved.forEach((m,i)=>{if(m>0&&m<=60)STEPS[i].min=m});
+
+let idx=0,remaining=STEPS[0].min*60000,running=false,endAt=0,alerted=false,sound=store.get("ptr-sound",true);
+const done=new Set();
+const C=2*Math.PI*88; $("ring").style.strokeDasharray=C;
+
+function fmt(ms){const neg=ms<0;let s=Math.ceil(Math.abs(ms)/1000);if(neg)s=Math.floor(Math.abs(ms)/1000);
+  const m=Math.floor(s/60),r=s%60;return (neg?"+":"")+m+":"+String(r).padStart(2,"0")}
+
+
+function esc(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+function sheetHTML(sh){
+  const cols='<colgroup><col style="width:34px"><col style="width:28%"><col style="width:14%"><col style="width:13%"><col style="width:13%"><col style="width:16%"><col style="width:16%"></colgroup>';
+  const head='<thead><tr><th></th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th></tr></thead>';
+  const body=sh.rows.map(rw=>{
+    const k=rw.k||"row";
+    let cells=rw.c||[[rw.t||"",6]];
+    const tds=cells.map(([t,span,cls])=>`<td${span>1?` colspan="${span}"`:""}${cls?` class="${cls}"`:""}>${esc(t)}</td>`).join("");
+    return `<tr class="${k}${rw.hi?" hi":""}"><td class="rn">${rw.n}</td>${tds}</tr>`}).join("");
+  return `<div class="sheetcap"><span class="xl">EXCEL</span>${esc(sh.cap)}</div><div class="sheetwrap"><table class="xlsheet">${cols}${head}<tbody>${body}</tbody></table></div>`+
+    (sh.rows.some(r=>r.hi)?'<div class="legend"><i></i>Highlighted rows: where your entries go. Example values shown.</div>':"");
+}
+function buildRail(){
+  $("rail").innerHTML=STEPS.map((s,i)=>`<li data-i="${i}"><button type="button" data-i="${i}"><span class="num">${i+1}</span><span class="nm">${s.short}<small>${s.whoTxt}</small></span><span class="dur">${s.min}:00</span></button></li>`).join("");
+  $("timeline").innerHTML=STEPS.map((s,i)=>`<button type="button" class="seg" data-i="${i}" style="flex:${s.min}" title="${i+1}. ${s.short} (${s.min} min)"><div class="fill"></div><span>${i+1} · ${s.short}</span></button>`).join("");
+  document.querySelectorAll("[data-i]").forEach(el=>{if(el.tagName==="BUTTON")el.addEventListener("click",()=>go(+el.dataset.i))});
+}
+function renderStep(){
+  const s=STEPS[idx];
+  $("place").className="place "+s.place; $("placeTxt").textContent=s.placeTxt; $("who").className="who "+s.who; $("who").textContent=s.whoTxt;
+  $("stepno").textContent=`Step ${idx+1} of ${STEPS.length} · ${s.min} min`;
+  $("title").textContent=s.title; $("goal").textContent=s.goal;
+  $("todo").innerHTML=s.todo.map(t=>`<li>${t}</li>`).join("");
+  $("record").innerHTML=`<b>Record</b>${s.record}`;
+  if(s.formula){$("formula").hidden=false;$("formula").textContent=s.formula}else $("formula").hidden=true;
+  if(s.sheet){$("sheet").hidden=false;$("sheet").style.cssText="display:flex;flex-direction:column;gap:10px";$("sheet").innerHTML=sheetHTML(s.sheet)}else{$("sheet").hidden=true;$("sheet").innerHTML=""}
+  document.querySelectorAll(".rail li").forEach((li,i)=>{li.classList.toggle("current",i===idx);li.classList.toggle("done",done.has(i)&&i!==idx);
+    li.querySelector(".dur").textContent=STEPS[i].min+":00"});
+  document.querySelectorAll(".seg").forEach((sg,i)=>{sg.style.flex=STEPS[i].min;sg.classList.toggle("current",i===idx);sg.classList.toggle("done",done.has(i)&&i!==idx);
+    if(i!==idx)sg.querySelector(".fill").style.width=done.has(i)?"100%":"0"});
+  tick();
+}
+function tick(){
+  if(running) remaining=endAt-Date.now();
+  const total=STEPS[idx].min*60000, frac=Math.max(0,Math.min(1,remaining/total));
+  $("digits").textContent=fmt(remaining);
+  $("ring").style.strokeDashoffset=C*(1-frac);
+  const t=$("timer");t.classList.toggle("warn",remaining>0&&remaining<=60000);t.classList.toggle("over",remaining<=0);
+  $("substate").textContent=remaining<=0?"Over time":running?"Running":(remaining===total?"Ready":"Paused");
+  $("startBtn").textContent=running?"Pause":(remaining===total?"Start":"Resume");
+  document.querySelector(`.seg[data-i="${idx}"] .fill`).style.width=(100*(1-frac))+"%";
+  let left=Math.max(0,remaining);for(let i=idx+1;i<STEPS.length;i++)left+=STEPS[i].min*60000;
+  $("totalLeft").textContent=fmt(left);
+  if(running&&remaining<=0&&!alerted){alerted=true;timeUp()}
+}
+function timeUp(){
+  const s=STEPS[idx], nxt=STEPS[idx+1];
+  beep(3);
+  const a=s.endAlert;
+  $("alert").classList.toggle("pc",!!(a&&a.pc));
+  $("alertKicker").textContent=a?a.kicker:`Time · step ${idx+1} done`;
+  $("alertTitle").textContent=a?a.title:(nxt?`Next: ${nxt.short}`:"Done");
+  $("alertText").textContent=a?a.text:(nxt?`${nxt.placeTxt}. ${nxt.min} minutes.`:"");
+  $("alertGo").hidden=!nxt; $("alertGo").textContent=nxt?`Start step ${idx+2}: ${nxt.short}`:"";
+  $("alertStay").textContent=nxt?"Stay on this step":"Close";
+  $("alert").hidden=false; $("alert").classList.remove("flash"); void $("alert").offsetWidth; $("alert").classList.add("flash");
+  $("alertGo").focus();
+}
+function go(i,autostart=false){
+  if(i<0||i>=STEPS.length)return;
+  if(i>idx) for(let k=0;k<i;k++)done.add(k);
+  idx=i;running=false;alerted=false;remaining=STEPS[i].min*60000;$("alert").hidden=true;
+  renderStep(); if(autostart) toggle();
+}
+let wake=null;
+async function keepAwake(){try{if(navigator.wakeLock&&!wake){wake=await navigator.wakeLock.request("screen");wake.addEventListener("release",()=>wake=null)}}catch(e){}}
+function toggle(){
+  unlockAudio();
+  if(running){remaining=endAt-Date.now();running=false}
+  else{endAt=Date.now()+remaining;running=true;keepAwake()}
+  tick();
+}
+function adjust(d){
+  const s=STEPS[idx];const nm=Math.max(1,Math.min(60,s.min+d));const delta=(nm-s.min)*60000;s.min=nm;
+  remaining+=delta;if(running)endAt+=delta;if(remaining>0)alerted=false;
+  store.set("ptr-durations",STEPS.map(x=>x.min));renderStep();
+}
+function reset(){running=false;alerted=false;remaining=STEPS[idx].min*60000;tick()}
+
+let actx=null;
+function unlockAudio(){try{if(!actx){const A=window.AudioContext||window.webkitAudioContext;if(A)actx=new A()}if(actx&&actx.state==="suspended")actx.resume()}catch(e){}}
+function beep(n){
+  if(!sound||!actx)return;
+  try{for(let k=0;k<n;k++){const t=actx.currentTime+k*0.45;const o=actx.createOscillator(),g=actx.createGain();
+    o.type="square";o.frequency.value=k===n-1?1046:784;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.25,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.35);o.connect(g).connect(actx.destination);o.start(t);o.stop(t+0.4)}}catch(e){}
+}
+
+$("startBtn").onclick=toggle;
+$("nextBtn").onclick=()=>go(idx+1);
+$("prevBtn").onclick=()=>go(idx-1);
+$("plusBtn").onclick=()=>adjust(1);
+$("minusBtn").onclick=()=>adjust(-1);
+$("resetBtn").onclick=reset;
+$("alertGo").onclick=()=>go(idx+1,true);
+$("alertStay").onclick=()=>{$("alert").hidden=true};
+function paintSound(){$("soundBtn").setAttribute("aria-pressed",sound);$("soundBtn").textContent=sound?"Sound on":"Sound off"}
+$("soundBtn").onclick=()=>{sound=!sound;store.set("ptr-sound",sound);paintSound();if(sound){unlockAudio();beep(1)}};
+$("fsBtn").onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch(e){$("fsBtn").textContent="Full screen unavailable"}};
+document.addEventListener("keydown",e=>{
+  if(e.target.closest&&e.target.closest("button")&&(e.key===" "||e.key==="Enter"))return;
+  if(e.key===" "){e.preventDefault();toggle()}
+  else if(e.key==="ArrowRight")go(idx+1);
+  else if(e.key==="ArrowLeft")go(idx-1);
+  else if(e.key==="r"||e.key==="R")reset();
+  else if(e.key==="+"||e.key==="=")adjust(1);
+  else if(e.key==="-"||e.key==="_")adjust(-1);
+  else if(e.key==="Escape")$("alert").hidden=true;
+});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&running)keepAwake()});
+buildRail();paintSound();renderStep();
+setInterval(()=>{if(running)tick()},200);
+</script>
+
+</body>
+</html>
